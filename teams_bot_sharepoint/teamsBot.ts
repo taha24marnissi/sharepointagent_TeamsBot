@@ -10,6 +10,7 @@ import {
 } from "@microsoft/agents-hosting";
 import { version } from "@microsoft/agents-hosting/package.json";
 import axios from "axios";
+import { getApprovalAdaptiveCard } from "./approvalCard";
 
 interface ConversationState {
   count: number;
@@ -110,91 +111,9 @@ teamsBot.activity(
       if (data.status === "interrupted" && data.thread_id) {
         // Set approval state
         state.conversation.awaitingApproval = true;
-        // Send adaptive card with approve/reject
-        // Adaptive Card JSON for approval
-        const adaptiveCard = {
-          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-          "type": "AdaptiveCard",
-          "version": "1.4",
-          "body": [
-            {
-              "type": "ColumnSet",
-              "columns": [
-                {
-                  "type": "Column",
-                  "width": "auto",
-                  "items": [
-                    {
-                      "type": "Image",
-                      "url": "https://www.clipartmax.com/png/middle/118-1180913_approve-document-icons-tick-and-cross-icon.png",
-                      "size": "Small",
-                      "style": "Person"
-                    }
-                  ]
-                },
-                {
-                  "type": "Column",
-                  "width": "stretch",
-                  "items": [
-                    {
-                      "type": "TextBlock",
-                      "text": "Action Required: Approval Needed",
-                      "weight": "Bolder",
-                      "size": "Large"
-                    },
-                    {
-                      "type": "TextBlock",
-                      "text": "Please review the following request and choose to Approve or Reject.",
-                      "isSubtle": true,
-                      "wrap": true
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "Container",
-              "items": [
-                {
-                  "type": "TextBlock",
-                  "text": data.response ?? "No response from the agent.",
-                  "wrap": true,
-                  "spacing": "Medium",
-                  "size": "Medium"
-                }
-              ],
-              "style": "emphasis",
-              "bleed": true
-            },
-            {
-              "type": "TextBlock",
-              "text": "If you have any questions, please contact your administrator.",
-              "isSubtle": true,
-              "wrap": true,
-              "spacing": "Medium"
-            }
-          ],
-          "actions": [
-            {
-              "type": "Action.Submit",
-              "title": "✅ Approve",
-              "style": "positive",
-              "data": {
-                ...data,
-                "msteams": { "type": "messageBack", "text": "ApproveButton" }
-              }
-            },
-            {
-              "type": "Action.Submit",
-              "title": "❌ Reject",
-              "style": "destructive",
-              "data": {
-                ...data,
-                "msteams": { "type": "messageBack", "text": "RejectButton" }
-              }
-            }
-          ]
-        };
+        // Use externalized Adaptive Card generator
+        const locale = context.activity.locale?.split('-')[0] || 'en';
+        const adaptiveCard = getApprovalAdaptiveCard(data, locale);
         const card = CardFactory.adaptiveCard(adaptiveCard);
         await context.sendActivity(MessageFactory.attachment(card));
       } else {
