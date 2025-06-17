@@ -1,10 +1,12 @@
-import { ActivityTypes } from "@microsoft/agents-activity";
+import { ActionTypes, ActivityTypes } from "@microsoft/agents-activity";
 import {
   AgentApplication,
   AttachmentDownloader,
+  CardFactory,
+  MessageFactory,
   MemoryStorage,
   TurnContext,
-  TurnState,
+  TurnState  
 } from "@microsoft/agents-hosting";
 import { version } from "@microsoft/agents-hosting/package.json";
 import axios from "axios";
@@ -66,16 +68,61 @@ teamsBot.activity(
   ActivityTypes.Message,
   async (context: TurnContext, state: ApplicationTurnState) => {
     try {
+      if (context.activity.text === "ApproveButton" || context.activity.text === "RejectButton") {
+        // Handle the adaptive card action
+      let user_input = context.activity.text;
+      if (user_input === "ApproveButton") {
+        user_input = "Approve";
+      } else if (user_input === "RejectButton") {
+        user_input = "Reject";
+      }
+        const continueResponse = await axios.post("http://localhost:8000/SharepointAgent-continue", {
+          user_input,
+          thread_id: "1"
+        }, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const continueData = continueResponse.data as { response?: string };
+        await context.sendActivity(continueData.response ?? "No response from the agent.");
+        return;
+      }
+
+      // Normal message flow
       const response = await axios.post("http://0.0.0.0:8000/SharepointAgent", {
-        text: context.activity.text,
+        user_input: context.activity.text,
+        thread_id: "1"
       }, {
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = response.data as { response?: string };
-      const res = data.response ?? "No response from the agent.";
+      const data = response.data as { response?: string; status?: string; thread_id?: string };
 
-      await context.sendActivity(res);
+      if (data.status === "interrupted" && data.thread_id) {
+        // Send adaptive card with approve/reject
+        var cardActions = [];
+        cardActions.push({
+            type: ActionTypes.MessageBack,
+            title: 'Approve',
+            value: data,
+            text: 'ApproveButton'
+        });
+        cardActions.push({
+            type: ActionTypes.MessageBack,
+            title: 'Reject',
+            value: data,
+            text: 'RejectButton'
+        });
+ const card = CardFactory.heroCard(
+            'Approval Card',
+            data.response ?? "No response from the agent.",
+            null,
+            cardActions
+        );
+        await context.sendActivity(MessageFactory.attachment(card));
+      } else {
+        await context.sendActivity(data.response ?? "No response from the agent.");
+      }
     } catch (error) {
       await context.sendActivity("Agent api error.");
     }
