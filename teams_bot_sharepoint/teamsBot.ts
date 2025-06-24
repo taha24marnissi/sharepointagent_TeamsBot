@@ -70,6 +70,7 @@ teamsBot.activity(
   ActivityTypes.Message,
   async (context: TurnContext, state: ApplicationTurnState) => {
     try {
+      var response = null;
       if (context.activity.text === "ApproveButton" || context.activity.text === "RejectButton") {
         // Handle the adaptive card action
         let user_input = context.activity.text;
@@ -80,15 +81,26 @@ teamsBot.activity(
         }
         // Clear approval state
         state.conversation.awaitingApproval = false;
-        const continueResponse = await axios.post("http://localhost:8000/SharepointAgent-continue", {
+        response= await axios.post("http://localhost:8000/SharepointAgent-continue", {
           user_input,
           thread_id: "1"
         }, {
           headers: { "Content-Type": "application/json" },
         });
+      const data = response.data as { response?: string; status?: string; thread_id?: string };
 
-        const continueData = continueResponse.data as { response?: string };
-        await context.sendActivity(continueData.response ?? "No response from the agent.");
+        if (data.status === "interrupted" && data.thread_id) {
+        // Set approval state
+        state.conversation.awaitingApproval = true;
+        // Use externalized Adaptive Card generator
+        const locale = context.activity.locale?.split('-')[0] || 'en';
+        const adaptiveCard = getApprovalAdaptiveCard(data, locale);
+        const card = CardFactory.adaptiveCard(adaptiveCard);
+        await context.sendActivity(MessageFactory.attachment(card));
+      } else {
+        await context.sendActivity(data.response ?? "No response from the agent.");
+      }
+        //await context.sendActivity(continueData.response ?? "No response from the agent.");
         return;
       }
 
@@ -99,7 +111,7 @@ teamsBot.activity(
       }
 
       // Normal message flow
-      const response = await axios.post("http://0.0.0.0:8000/SharepointAgent", {
+      response = await axios.post("http://0.0.0.0:8000/SharepointAgent", {
         user_input: context.activity.text,
         thread_id: "1"
       }, {
