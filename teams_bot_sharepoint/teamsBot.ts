@@ -70,6 +70,7 @@ teamsBot.activity(
   ActivityTypes.Message,
   async (context: TurnContext, state: ApplicationTurnState) => {
     try {
+      var conversation_id = context.activity.conversation.id
       var response = null;
       if (context.activity.text === "ApproveButton" || context.activity.text === "RejectButton") {
         // Handle the adaptive card action
@@ -81,9 +82,9 @@ teamsBot.activity(
         }
         // Clear approval state
         state.conversation.awaitingApproval = false;
-        response= await axios.post("http://localhost:8000/SharepointAgent-continue", {
+        response= await axios.post("http://0.0.0.0:8000/SharepointAgent-continue", {
           user_input,
-          thread_id: "1"
+          thread_id: conversation_id
         }, {
           headers: { "Content-Type": "application/json" },
         });
@@ -113,7 +114,7 @@ teamsBot.activity(
       // Normal message flow
       response = await axios.post("http://0.0.0.0:8000/SharepointAgent", {
         user_input: context.activity.text,
-        thread_id: "1"
+        thread_id: conversation_id
       }, {
         headers: { "Content-Type": "application/json" },
       });
@@ -132,7 +133,7 @@ teamsBot.activity(
         await context.sendActivity(data.response ?? "No response from the agent.");
       }
     } catch (error) {
-      await context.sendActivity("Agent api error.");
+      await context.sendActivity(`Agent api error: ${error.message}`);
     }
   }
 );
