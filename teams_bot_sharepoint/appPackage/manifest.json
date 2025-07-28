@@ -1,7 +1,7 @@
 {
     "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.21/MicrosoftTeams.schema.json",
     "manifestVersion": "1.21",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "id": "${{TEAMS_APP_ID}}",
     "developer": {
         "name": "My App, Inc.",
@@ -14,14 +14,14 @@
         "outline": "outline.png"
     },
     "name": {
-        "short": "teams_bot_sharepoint${{APP_NAME_SUFFIX}}",
-        "full": "full name for teams_bot_sharepoint"
+        "short": "teams_bot_sharepoint${{APP_NAME_SUFFIX}}_taha",
+        "full": "full name for teams_bot_sharepoint_taha"
     },
     "description": {
-        "short": "short description for teams_bot_sharepoint",
-        "full": "full description for teams_bot_sharepoint"
+        "short": "short description for teams_bot_sharepoint_taha",
+        "full": "full description for teams_bot_sharepoint_taha"
     },
-    "accentColor": "#FFFFFF",
+    "accentColor": "#e62e2e",
     "bots": [
         {
             "botId": "${{BOT_ID}}",

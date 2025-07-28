@@ -1,4 +1,4 @@
-import { ActionTypes, ActivityTypes } from "@microsoft/agents-activity";
+import { ActivityTypes } from "@microsoft/agents-activity";
 import {
   AgentApplication,
   AttachmentDownloader,
@@ -8,7 +8,6 @@ import {
   TurnContext,
   TurnState  
 } from "@microsoft/agents-hosting";
-import { version } from "@microsoft/agents-hosting/package.json";
 import axios from "axios";
 import { getApprovalAdaptiveCard } from "./approvalCard";
 
@@ -33,34 +32,12 @@ teamsBot.message("/reset", async (context: TurnContext, state: ApplicationTurnSt
   await context.sendActivity("Ok I've deleted the current conversation state.");
 });
 
-teamsBot.message("/count", async (context: TurnContext, state: ApplicationTurnState) => {
-  const count = state.conversation.count ?? 0;
-  await context.sendActivity(`The count is ${count}`);
-});
-
-teamsBot.message("/diag", async (context: TurnContext, state: ApplicationTurnState) => {
-  await state.load(context, storage);
-  await context.sendActivity(JSON.stringify(context.activity));
-});
-
-teamsBot.message("/state", async (context: TurnContext, state: ApplicationTurnState) => {
-  await state.load(context, storage);
-  await context.sendActivity(JSON.stringify(state));
-});
-
-teamsBot.message("/runtime", async (context: TurnContext, state: ApplicationTurnState) => {
-  const runtime = {
-    nodeversion: process.version,
-    sdkversion: version,
-  };
-  await context.sendActivity(JSON.stringify(runtime));
-});
 
 teamsBot.conversationUpdate(
   "membersAdded",
   async (context: TurnContext, state: ApplicationTurnState) => {
     await context.sendActivity(
-      `Hi there! I'm an echo bot running on Agents SDK version ${version} that will echo what you said to me.`
+      `Hi there! I'm a SharePoint Agent bot running on Microsoft Teams.`
     );
   }
 );
@@ -82,7 +59,7 @@ teamsBot.activity(
         }
         // Clear approval state
         state.conversation.awaitingApproval = false;
-        response= await axios.post("http://0.0.0.0:8000/SharepointAgent-continue", {
+        response= await axios.post(`${process.env.API_URL}/SharepointAgent-continue`, {
           user_input,
           thread_id: conversation_id
         }, {
@@ -110,9 +87,9 @@ teamsBot.activity(
         await context.sendActivity("You have a pending approval request. Please respond to the approval card before sending other messages.");
         return;
       }
-
+      var url=process.env.API_URL
       // Normal message flow
-      response = await axios.post("http://0.0.0.0:8000/SharepointAgent", {
+      response = await axios.post(`${url}/SharepointAgent`, {
         user_input: context.activity.text,
         thread_id: conversation_id
       }, {

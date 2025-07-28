@@ -80,3 +80,4 @@ deploy:
       envs:
         clientId: ${{BOT_ID}}
         clientSecret: ${{SECRET_BOT_PASSWORD}}
+        API_URL: ${{API_URL}}
