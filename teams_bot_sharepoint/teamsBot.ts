@@ -6,10 +6,12 @@ import {
   MessageFactory,
   MemoryStorage,
   TurnContext,
-  TurnState  
+  TurnState,
+  
 } from "@microsoft/agents-hosting";
 import axios from "axios";
 import { getApprovalAdaptiveCard } from "./approvalCard";
+import { TeamsInfo } from "botbuilder";
 
 interface ConversationState {
   count: number;
@@ -46,22 +48,36 @@ teamsBot.conversationUpdate(
 teamsBot.activity(
   ActivityTypes.Message,
   async (context: TurnContext, state: ApplicationTurnState) => {
+                var continuationToken;
+            var members = [];
+
+            do {
+                // Gets a paginated list of members of one-on-one, group, or team conversation.
+                var pagedMembers = await TeamsInfo.getPagedMembers(context, 100, continuationToken);
+                continuationToken = pagedMembers.continuationToken;
+                members.push(...pagedMembers.members);
+            }
+            while(continuationToken !== undefined)
     try {
       var conversation_id = context.activity.conversation.id
+      //var userId = context.activity.from.id;
+      var CurrentUserMail ="taha@3rd5pw.onmicrosoft.com";
       var response = null;
+      var user_inputs = JSON.stringify(context.activity.value);
       if (context.activity.text === "ApproveButton" || context.activity.text === "RejectButton") {
         // Handle the adaptive card action
         let user_input = context.activity.text;
         if (user_input === "ApproveButton") {
-          user_input = "Approve";
+          user_input = "Approve"; 
         } else if (user_input === "RejectButton") {
           user_input = "Reject";
         }
         // Clear approval state
         state.conversation.awaitingApproval = false;
         response= await axios.post(`${process.env.API_URL}/SharepointAgent-continue`, {
-          user_input,
-          thread_id: conversation_id
+          user_input: user_inputs,
+          thread_id: conversation_id,
+          type: user_input,
         }, {
           headers: { "Content-Type": "application/json" },
         });
@@ -71,7 +87,7 @@ teamsBot.activity(
         // Set approval state
         state.conversation.awaitingApproval = true;
         // Use externalized Adaptive Card generator
-        const locale = context.activity.locale?.split('-')[0] || 'en';
+        const locale = context.activity.locale?.split('-')[0] || 'en';        
         const adaptiveCard = getApprovalAdaptiveCard(data, locale);
         const card = CardFactory.adaptiveCard(adaptiveCard);
         await context.sendActivity(MessageFactory.attachment(card));
@@ -91,7 +107,8 @@ teamsBot.activity(
       // Normal message flow
       response = await axios.post(`${url}/SharepointAgent`, {
         user_input: context.activity.text,
-        thread_id: conversation_id
+        thread_id: conversation_id,
+        user_email: CurrentUserMail
       }, {
         headers: { "Content-Type": "application/json" },
       });
@@ -103,6 +120,7 @@ teamsBot.activity(
         state.conversation.awaitingApproval = true;
         // Use externalized Adaptive Card generator
         const locale = context.activity.locale?.split('-')[0] || 'en';
+     
         const adaptiveCard = getApprovalAdaptiveCard(data, locale);
         const card = CardFactory.adaptiveCard(adaptiveCard);
         await context.sendActivity(MessageFactory.attachment(card));
@@ -118,10 +136,14 @@ teamsBot.activity(
 teamsBot.activity(/^message/, async (context: TurnContext, state: ApplicationTurnState) => {
   await context.sendActivity(`Matched with regex: ${context.activity.type}`);
 });
-
+teamsBot.activity(ActivityTypes.Invoke, async (context: TurnContext, state: ApplicationTurnState) => {
+  //await context.sendActivity(`Matched with regex: ${context.activity.type}`);
+});
 teamsBot.activity(
   async (context: TurnContext) => Promise.resolve(context.activity.type === "message"),
   async (context, state) => {
     await context.sendActivity(`Matched function: ${context.activity.type}`);
   }
 );
+
+

@@ -7,17 +7,42 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
       prompt: "Please review the following request and choose to Approve or Reject.",
       approve: "✅ Approve",
       reject: "❌ Reject",
-      help: "If you have any questions, please contact your administrator."
+      help: "If you have any questions, please contact your administrator.",
+      inputLabel: "Additional Comments:",
+      inputPlaceholder: "Enter your comments here..."
     },
     fr: {
       title: "Action requise : Approbation nécessaire",
       prompt: "Veuillez examiner la demande suivante et choisir d'approuver ou de rejeter.",
       approve: "✅ Approuver",
       reject: "❌ Rejeter",
-      help: "Si vous avez des questions, veuillez contacter votre administrateur."
+      help: "Si vous avez des questions, veuillez contacter votre administrateur.",
+      inputLabel: "Commentaires supplémentaires :",
+      inputPlaceholder: "Entrez vos commentaires ici..."
     }
   };
   const t = translations[locale] || translations['en'];
+  
+  // Parse response and create inputs
+  const responseObj = JSON.parse(data.response.replace(/'/g, '"'));
+  const parameters = responseObj.parameters;
+  const parameterInputs = Object.entries(parameters).map(([key, value]) => [
+      {
+        "type": "TextBlock",
+        "text": `${key.replace(/_/g, ' ').toUpperCase()}:`,
+        "wrap": true,
+        "spacing": "Medium"
+      },
+      {
+        "type": "Input.Text",
+        "id": key,
+        "value": value,
+        "placeholder": `Enter ${key.replace(/_/g, ' ')}`,
+        "isMultiline": false,
+        "spacing": "Small"
+      }
+    ]).flat();
+
   return {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
     "type": "AdaptiveCard",
@@ -63,7 +88,7 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
         "items": [
           {
             "type": "TextBlock",
-            "text": data.response ?? (locale === 'fr' ? "Aucune réponse de l'agent." : "No response from the agent."),
+            "text": responseObj.text,
             "wrap": true,
             "spacing": "Medium",
             "size": "Medium"
@@ -72,6 +97,7 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
         "style": "emphasis",
         "bleed": true
       },
+      ...parameterInputs,
       {
         "type": "TextBlock",
         "text": t.help,
@@ -86,7 +112,6 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
         "title": t.approve,
         "style": "positive",
         "data": {
-          ...data,
           "msteams": { "type": "messageBack", "text": "ApproveButton" }
         }
       },
@@ -95,7 +120,6 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
         "title": t.reject,
         "style": "destructive",
         "data": {
-          ...data,
           "msteams": { "type": "messageBack", "text": "RejectButton" }
         }
       }
