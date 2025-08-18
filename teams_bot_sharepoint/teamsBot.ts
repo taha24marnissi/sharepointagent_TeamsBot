@@ -47,17 +47,7 @@ teamsBot.conversationUpdate(
 // Listen for ANY message to be received. MUST BE AFTER ANY OTHER MESSAGE HANDLERS
 teamsBot.activity(
   ActivityTypes.Message,
-  async (context: TurnContext, state: ApplicationTurnState) => {
-                var continuationToken;
-            var members = [];
-
-            do {
-                // Gets a paginated list of members of one-on-one, group, or team conversation.
-                var pagedMembers = await TeamsInfo.getPagedMembers(context, 100, continuationToken);
-                continuationToken = pagedMembers.continuationToken;
-                members.push(...pagedMembers.members);
-            }
-            while(continuationToken !== undefined)
+  async (context: TurnContext, state: ApplicationTurnState) => {          
     try {
       var conversation_id = context.activity.conversation.id
       //var userId = context.activity.from.id;
@@ -66,18 +56,18 @@ teamsBot.activity(
       var user_inputs = JSON.stringify(context.activity.value);
       if (context.activity.text === "ApproveButton" || context.activity.text === "RejectButton") {
         // Handle the adaptive card action
-        let user_input = context.activity.text;
-        if (user_input === "ApproveButton") {
-          user_input = "Approve"; 
-        } else if (user_input === "RejectButton") {
-          user_input = "Reject";
+        let answer_type = context.activity.text;
+        if (answer_type === "ApproveButton") {
+          answer_type = "Approve"; 
+        } else if (answer_type === "RejectButton") {
+          answer_type = "Reject";
         }
         // Clear approval state
         state.conversation.awaitingApproval = false;
         response= await axios.post(`${process.env.API_URL}/SharepointAgent-continue`, {
           user_input: user_inputs,
           thread_id: conversation_id,
-          type: user_input,
+          type: answer_type,
         }, {
           headers: { "Content-Type": "application/json" },
         });
