@@ -24,9 +24,18 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
   const t = translations[locale] || translations['en'];
   
   // Parse response and create inputs
-  const responseObj = JSON.parse(data.response.replace(/'/g, '"'));
-  const parameters = responseObj.parameters;
-  const parameterInputs = Object.entries(parameters).map(([key, value]) => [
+  const responseObj = JSON.parse(data.response.replace(/'/g, '"').replace(/True/g, 'true')
+      .replace(/False/g, 'false'));
+  const parameters = responseObj.parameters || {};
+  
+  // Add validation to ensure parameters is an object
+  if (typeof parameters !== 'object' || parameters === null) {
+    throw new Error('Parameters must be an object');
+  }
+
+  const parameterInputs = Object.entries(parameters)
+    .filter(([_, value]) => value !== undefined) // Filter out undefined values
+    .map(([key, value]) => [
       {
         "type": "TextBlock",
         "text": `${key.replace(/_/g, ' ').toUpperCase()}:`,
@@ -36,9 +45,9 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
       {
         "type": "Input.Text",
         "id": key,
-        "value": value,
+        "value": typeof value === 'object' ? JSON.stringify(value) : String(value), // Handle objects
         "placeholder": `Enter ${key.replace(/_/g, ' ')}`,
-        "isMultiline": false,
+        "isMultiline": typeof value === 'object', // Make input multiline for objects
         "spacing": "Small"
       }
     ]).flat();
