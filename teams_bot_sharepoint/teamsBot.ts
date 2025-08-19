@@ -10,8 +10,7 @@ import {
   
 } from "@microsoft/agents-hosting";
 import axios from "axios";
-import { getApprovalAdaptiveCard } from "./approvalCard";
-import { TeamsInfo } from "botbuilder";
+import { getApprovalAdaptiveCard } from "./approvalCard"; 
 
 interface ConversationState {
   count: number;
@@ -118,6 +117,7 @@ teamsBot.activity(
         await context.sendActivity(data.response ?? "No response from the agent.");
       }
     } catch (error) {
+      state.conversation.awaitingApproval = false;
       await context.sendActivity(`Agent api error: ${error.message}`);
     }
   }
