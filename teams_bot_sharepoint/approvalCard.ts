@@ -4,18 +4,18 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
   const translations: any = {
     en: {
       title: "Action Required: Approval Needed",
-      prompt: "Please review the following request and choose to Approve or Reject.",
-      approve: "✅ Approve",
-      reject: "❌ Reject",
+      prompt: "Please review the following request and choose to Proceed or Cancel.",
+      approve: "✅ Proceed",
+      reject: "❌ Cancel",
       help: "If you have any questions, please contact your administrator.",
       inputLabel: "Additional Comments:",
       inputPlaceholder: "Enter your comments here..."
     },
     fr: {
       title: "Action requise : Approbation nécessaire",
-      prompt: "Veuillez examiner la demande suivante et choisir d'approuver ou de rejeter.",
-      approve: "✅ Approuver",
-      reject: "❌ Rejeter",
+      prompt: "Veuillez examiner la demande suivante et choisir de procéder ou d'annuler.",
+      approve: "✅ Procéder",
+      reject: "❌ Annuler",
       help: "Si vous avez des questions, veuillez contacter votre administrateur.",
       inputLabel: "Commentaires supplémentaires :",
       inputPlaceholder: "Entrez vos commentaires ici..."
@@ -32,25 +32,78 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
   if (typeof parameters !== 'object' || parameters === null) {
     throw new Error('Parameters must be an object');
   }
+// Define a union of all AdaptiveCard element types you want to support
+type AdaptiveCardElement =
+  | {
+      type: "Container";
+      items: {
+        type: "TextBlock";
+        text: string;
+        wrap: boolean;
+        spacing: string;
+      }[];
+      style: string;
+    }
+  | {
+      type: "TextBlock";
+      text: string;
+      wrap: boolean;
+      spacing: string;
+    }
+  | {
+      type: "Input.Text";
+      id: string;
+      value: string;
+      placeholder: string;
+      isMultiline: boolean;
+      spacing: string;
+    };
 
-  const parameterInputs = Object.entries(parameters)
-    .filter(([_, value]) => value !== undefined) // Filter out undefined values
-    .map(([key, value]) => [
+// Force parameterInputs to be AdaptiveCardElement[]
+const parameterInputs: AdaptiveCardElement[] = Object.entries(parameters)
+  .filter(([_, value]) => value !== undefined)
+  .flatMap(([key, value]): AdaptiveCardElement[] => {
+    if (typeof value === "object" && Array.isArray(value)) {
+      // array branch → Containers
+      return value.map((item, index) => ({
+        type: "Container" as const,
+        items: [
+          {
+            type: "TextBlock" as const,
+            text: `${key.replace(/_/g, " ")} - ${index}:`,
+            wrap: true,
+            spacing: "Medium",
+          },
+          {
+            type: "TextBlock" as const,
+            text: `${item.Name} : ${item.Type}`,
+            wrap: true,
+            spacing: "Medium",
+          }
+        ],
+        style: "emphasis",
+      }));
+    }
+
+    // primitive branch → TextBlock + Input.Text
+    return [
       {
-        "type": "TextBlock",
-        "text": `${key.replace(/_/g, ' ').toUpperCase()}:`,
-        "wrap": true,
-        "spacing": "Medium"
+        type: "TextBlock" as const,
+        text: `${key.replace(/_/g, " ")}:`,
+        wrap: true,
+        spacing: "Medium"
       },
       {
-        "type": "Input.Text",
-        "id": key,
-        "value": typeof value === 'object' ? JSON.stringify(value) : String(value), // Handle objects
-        "placeholder": `Enter ${key.replace(/_/g, ' ')}`,
-        "isMultiline": typeof value === 'object', // Make input multiline for objects
-        "spacing": "Small"
-      }
-    ]).flat();
+        type: "Input.Text" as const,
+        id: key,
+        value: String(value),
+        placeholder: `Enter ${key.replace(/_/g, " ")}`,
+        isMultiline: String(value).length > 50,
+        spacing: "Small"
+      },
+    ];
+  });
+
 
   return {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
@@ -106,6 +159,7 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
         "style": "emphasis",
         "bleed": true
       },
+      
       ...parameterInputs,
       {
         "type": "TextBlock",
@@ -121,7 +175,7 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
         "title": t.approve,
         "style": "positive",
         "data": {
-          "msteams": { "type": "messageBack", "text": "ApproveButton" }
+          "msteams": { "type": "messageBack", "text": "Proceed" }
         }
       },
       {
@@ -129,7 +183,7 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
         "title": t.reject,
         "style": "destructive",
         "data": {
-          "msteams": { "type": "messageBack", "text": "RejectButton" }
+          "msteams": { "type": "messageBack", "text": "Cancel" }
         }
       }
     ]

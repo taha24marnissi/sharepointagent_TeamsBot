@@ -54,14 +54,10 @@ teamsBot.activity(
       var CurrentUserMail ="taha@3rd5pw.onmicrosoft.com";
       var response = null;
       var user_inputs = JSON.stringify(context.activity.value);
-      if (context.activity.text === "ApproveButton" || context.activity.text === "RejectButton") {
+      if (context.activity.text === "Proceed" || context.activity.text === "Cancel") {
         // Handle the adaptive card action
         let answer_type = context.activity.text;
-        if (answer_type === "ApproveButton") {
-          answer_type = "Approve"; 
-        } else if (answer_type === "RejectButton") {
-          answer_type = "Reject";
-        }
+        
         // Clear approval state
         state.conversation.awaitingApproval = false;
         response= await axios.post(`${process.env.API_URL}/SharepointAgent-continue`, {
@@ -87,7 +83,6 @@ teamsBot.activity(
         //await context.sendActivity(continueData.response ?? "No response from the agent.");
         return;
       }
-
       // If awaiting approval, block other messages
       if (state.conversation.awaitingApproval) {
         await context.sendActivity("You have a pending approval request. Please respond to the approval card before sending other messages.");
