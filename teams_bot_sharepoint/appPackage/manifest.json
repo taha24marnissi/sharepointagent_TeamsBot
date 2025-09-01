@@ -43,6 +43,10 @@
                       {
                           "title": "/reset",
                           "description": "Delete conversation state."
+                      },
+                      {
+                          "title": "what can you do?",
+                          "description": "List all available features."
                       }
                   ]
                 }

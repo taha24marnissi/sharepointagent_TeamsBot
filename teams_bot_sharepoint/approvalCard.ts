@@ -26,84 +26,7 @@ export function getApprovalAdaptiveCard(data: any, locale: string = 'en'): any {
   // Parse response and create inputs
   const responseObj = JSON.parse(data.response.replace(/'/g, '"').replace(/True/g, 'true')
       .replace(/False/g, 'false'));
-  const parameters = responseObj.parameters || {};
   
-  // Add validation to ensure parameters is an object
-  if (typeof parameters !== 'object' || parameters === null) {
-    throw new Error('Parameters must be an object');
-  }
-// Define a union of all AdaptiveCard element types you want to support
-type AdaptiveCardElement =
-  | {
-      type: "Container";
-      items: {
-        type: "TextBlock";
-        text: string;
-        wrap: boolean;
-        spacing: string;
-      }[];
-      style: string;
-    }
-  | {
-      type: "TextBlock";
-      text: string;
-      wrap: boolean;
-      spacing: string;
-    }
-  | {
-      type: "Input.Text";
-      id: string;
-      value: string;
-      placeholder: string;
-      isMultiline: boolean;
-      spacing: string;
-    };
-
-// Force parameterInputs to be AdaptiveCardElement[]
-const parameterInputs: AdaptiveCardElement[] = Object.entries(parameters)
-  .filter(([_, value]) => value !== undefined)
-  .flatMap(([key, value]): AdaptiveCardElement[] => {
-    if (typeof value === "object" && Array.isArray(value)) {
-      // array branch → Containers
-      return value.map((item, index) => ({
-        type: "Container" as const,
-        items: [
-          {
-            type: "TextBlock" as const,
-            text: `${key.replace(/_/g, " ")} - ${index}:`,
-            wrap: true,
-            spacing: "Medium",
-          },
-          {
-            type: "TextBlock" as const,
-            text: `${item.Name} : ${item.Type}`,
-            wrap: true,
-            spacing: "Medium",
-          }
-        ],
-        style: "emphasis",
-      }));
-    }
-
-    // primitive branch → TextBlock + Input.Text
-    return [
-      {
-        type: "TextBlock" as const,
-        text: `${key.replace(/_/g, " ")}:`,
-        wrap: true,
-        spacing: "Medium"
-      },
-      {
-        type: "Input.Text" as const,
-        id: key,
-        value: String(value),
-        placeholder: `Enter ${key.replace(/_/g, " ")}`,
-        isMultiline: String(value).length > 50,
-        spacing: "Small"
-      },
-    ];
-  });
-
 
   return {
     "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
@@ -134,12 +57,6 @@ const parameterInputs: AdaptiveCardElement[] = Object.entries(parameters)
                 "text": t.title,
                 "weight": "Bolder",
                 "size": "Large"
-              },
-              {
-                "type": "TextBlock",
-                "text": t.prompt,
-                "isSubtle": true,
-                "wrap": true
               }
             ]
           }
@@ -150,7 +67,7 @@ const parameterInputs: AdaptiveCardElement[] = Object.entries(parameters)
         "items": [
           {
             "type": "TextBlock",
-            "text": responseObj.text,
+            "text": responseObj.message,
             "wrap": true,
             "spacing": "Medium",
             "size": "Medium"
@@ -158,9 +75,7 @@ const parameterInputs: AdaptiveCardElement[] = Object.entries(parameters)
         ],
         "style": "emphasis",
         "bleed": true
-      },
-      
-      ...parameterInputs,
+      },      
       {
         "type": "TextBlock",
         "text": t.help,
