@@ -1,30 +1,85 @@
-# Overview of the Basic Bot template
+# SharePoint AI Assistant Teams Bot
 
-Examples of Microsoft Teams bots in everyday use include:
+This Microsoft Teams bot integrates with a FastAPI backend to provide conversational AI assistance with SharePoint capabilities. The bot can handle general chat conversations (like ChatGPT) and specialized SharePoint operations.
 
-- Bots that notify about build failures.
-- Bots that provide information about the weather or bus schedules.
-- Bots that provide travel information.
+## Features
 
-A bot interaction can be a quick question and answer, or it can be a complex conversation. Being a cloud application, a bot can provide valuable and secure access to cloud services and corporate resources.
+- **💬 General Conversation**: Ask anything like ChatGPT - questions, explanations, coding help, etc.
+- **📊 SharePoint Integration**: Manage sites, documents, and lists through natural language
+- **📄 File Upload**: Upload documents directly to SharePoint with intelligent destination parsing
+- **🔄 Conversation Memory**: Maintains context across messages using thread-based conversations
+- **🌐 Multi-language Support**: Built-in support for multiple languages
 
-## Get started with the Basic Bot template
+## Architecture
 
-> **Prerequisites**
->
-> To run the Basic Bot template in your local dev machine, you will need:
->
-> - [Node.js](https://nodejs.org/), supported versions: 18, 20, 22
-> - [Microsoft 365 Agents Toolkit Visual Studio Code Extension](https://aka.ms/teams-toolkit) version 5.0.0 and higher or [Microsoft 365 Agents Toolkit CLI](https://aka.ms/teamsfx-toolkit-cli)
+```
+Teams Client ↔ Teams Bot (Node.js/Express) ↔ FastAPI Backend ↔ SharePoint/Microsoft Graph
+```
 
-> For local debugging using Microsoft 365 Agents Toolkit CLI, you need to do some extra steps described in [Set up your Microsoft 365 Agents Toolkit CLI for local debugging](https://aka.ms/teamsfx-cli-debugging).
+## Setup Instructions
 
-1. First, select the Microsoft 365 Agents Toolkit icon on the left in the VS Code toolbar.
-2. Press F5 to start debugging which launches your app in Microsoft 365 Agents Playground using a web browser. Select `Debug in Microsoft 365 Agents Playground`.
-3. The browser will pop up to open Microsoft 365 Agents Playground.
-4. You will receive a welcome message from the bot, and you can send anything to the bot to get an echoed response.
+### Prerequisites
 
-**Congratulations**! You are running an application that can now interact with users in Microsoft 365 Agents Playground:
+- [Node.js](https://nodejs.org/) (versions 18, 20, or 22)
+- [Microsoft 365 Agents Toolkit Visual Studio Code Extension](https://aka.ms/teams-toolkit) version 5.0.0+
+- FastAPI backend running (your AI assistant with SharePoint integration)
+
+### Backend Configuration
+
+1. **Start your FastAPI backend** first:
+   ```bash
+   # In your backend directory
+   python main_chat.py
+   # Should be running on http://localhost:8000
+   ```
+
+2. **Configure the bot** to connect to your backend:
+   ```bash
+   # Copy environment template
+   cp .env.example .env
+   
+   # Edit .env file
+   API_URL=http://localhost:8000
+   ```
+
+### Running the Teams Bot
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Start debugging** in VS Code:
+   - Open Microsoft 365 Agents Toolkit panel in VS Code
+   - Press F5 to start debugging
+   - Select `Debug in Microsoft 365 Agents Playground`
+
+3. **Test the integration**:
+   - Send a message: "Hello, how are you?"
+   - Try SharePoint commands: "List my SharePoint sites"
+   - Upload a file with destination: "Upload to site marketing in Documents"
+
+## Usage Examples
+
+### General Chat
+- "Hello, how are you today?"
+- "Explain machine learning to me"
+- "Help me write a Python script"
+- "What's the capital of France?"
+
+### SharePoint Operations
+- "Get info for site contoso.sharepoint.com/sites/team"
+- "List document libraries in the marketing site"
+- "Show me documents in the shared library"
+- "Create item in list: abc123 Title: New Project Status: Planning"
+
+### File Upload
+Simply attach a file and include destination instructions:
+- "Upload to Documents"
+- "Site marketing in Projects folder"
+- "https://company.sharepoint.com/sites/team in Reports"
+
+**Congratulations**! You now have an AI-powered SharePoint assistant running in Teams:
 
 ![basic bot](./img/echo-bot.png)
 

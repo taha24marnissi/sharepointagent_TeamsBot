@@ -54,15 +54,30 @@ server.post("/api/messages", async (req: Request, res: Response) => {
   });
 });
 
+// Add health check endpoint
+server.get("/health", (req, res) => {
+  res.json({ 
+    status: "healthy", 
+    timestamp: new Date().toISOString(),
+    backendUrl: process.env.API_URL || "http://localhost:8000",
+    botId: authConfig.clientId 
+  });
+});
+
 // Start the server
 const port = process.env.PORT || 3978;
+const backendUrl = process.env.API_URL || "http://localhost:8000";
+
 server
   .listen(port, () => {
-    console.log(
-      `Bot Started, listening to port ${port} for appId ${authConfig.clientId} debug ${process.env.DEBUG}`
-    );
+    console.log(`🤖 SharePoint AI Assistant Teams Bot Started!`);
+    console.log(`📡 Server: http://localhost:${port}`);
+    console.log(`🔗 Backend API: ${backendUrl}`);
+    console.log(`🆔 Bot ID: ${authConfig.clientId}`);
+    console.log(`🐛 Debug Mode: ${process.env.DEBUG || 'false'}`);
+    console.log(`✅ Ready to receive messages!`);
   })
   .on("error", (err) => {
-    console.error(err);
+    console.error("❌ Server startup error:", err);
     process.exit(1);
   });

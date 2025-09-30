@@ -1,7 +1,7 @@
 {
     "name": "teamsbotsharepoint",
     "version": "1.0.0",
-    "description": "Microsoft 365 Agents Toolkit echo bot sample",
+    "description": "SharePoint AI Assistant Teams Bot built with Microsoft 365 Agents Toolkit",
     "engines": {
         "node": "18 || 20 || 22"
     },
@@ -9,6 +9,7 @@
     "license": "MIT",
     "main": "./lib/index.js",
     "scripts": {
+        "setup": "node setup.js",
         "dev:teamsfx": "env-cmd --silent -f .localConfigs npm run dev",
         "dev:teamsfx:testtool": "env-cmd --silent -f .localConfigs.playground npm run dev",
         "dev:teamsfx:launch-testtool": "env-cmd --silent -f env/.env.playground teamsapptester start",
@@ -25,7 +26,9 @@
     "dependencies": {
         "@microsoft/agents-hosting": "^0.2.14",
         "axios": "^1.9.0",
-        "express": "^5.0.1"
+        "express": "^5.0.1",
+        "form-data": "^4.0.0",
+        "dotenv": "^16.0.0"
     },
     "devDependencies": {
         "@types/express": "^5.0.0",

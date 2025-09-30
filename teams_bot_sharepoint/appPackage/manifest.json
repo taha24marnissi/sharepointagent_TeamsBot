@@ -30,23 +30,31 @@
                 "team",
                 "groupChat"
             ],
-            "supportsFiles": false,
+            "supportsFiles": true,
             "isNotificationOnly": false,
             "commandLists": [
                 {
                   "scopes": ["personal", "team", "groupChat"],
                   "commands": [
                       {
-                          "title": "Hi",
-                          "description": "Say hi to the bot."
+                          "title": "Hello",
+                          "description": "Start a conversation with the AI assistant"
                       },
                       {
                           "title": "/reset",
-                          "description": "Delete conversation state."
+                          "description": "Clear conversation history and start fresh"
                       },
                       {
-                          "title": "what can you do?",
-                          "description": "List all available features."
+                          "title": "List my SharePoint sites",
+                          "description": "Get information about your SharePoint sites"
+                      },
+                      {
+                          "title": "What can you do?",
+                          "description": "Learn about my capabilities"
+                      },
+                      {
+                          "title": "Help me with SharePoint",
+                          "description": "Get assistance with SharePoint operations"
                       }
                   ]
                 }
