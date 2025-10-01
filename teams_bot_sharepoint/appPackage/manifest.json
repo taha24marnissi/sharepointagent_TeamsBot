@@ -14,12 +14,12 @@
         "outline": "outline.png"
     },
     "name": {
-        "short": "teams_bot_sharepoint${{APP_NAME_SUFFIX}}_taha",
-        "full": "full name for teams_bot_sharepoint_taha"
+        "short": "teams_bot_sharepoint${{APP_NAME_SUFFIX}}_ ",
+        "full": "full name for teams_bot_sharepoint_ "
     },
     "description": {
-        "short": "short description for teams_bot_sharepoint_taha",
-        "full": "full description for teams_bot_sharepoint_taha"
+        "short": "short description for teams_bot_sharepoint_ ",
+        "full": "full description for teams_bot_sharepoint_ "
     },
     "accentColor": "#e62e2e",
     "bots": [

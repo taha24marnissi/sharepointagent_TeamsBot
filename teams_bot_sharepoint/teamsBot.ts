@@ -126,33 +126,53 @@ async function handleFileAttachment(
   destination?: string
 ): Promise<string> {
   try {
-    // For Microsoft 365 Agents Toolkit, we can access the attachment content directly
-    // or download it using the bot framework connector
-    console.log(`📥 Processing attachment: ${attachment.name}`);
-    console.log(`📎 Content Type: ${attachment.contentType}`);
+    // Enhanced attachment processing with better logging
+    console.log(`📥 Processing attachment: ${attachment.name || 'Unnamed file'}`);
+    console.log(`📎 Content Type: ${attachment.contentType || 'Unknown'}`);
     console.log(`📏 Content URL: ${attachment.contentUrl ? 'Available' : 'Not available'}`);
+    console.log(`📦 Direct Content: ${attachment.content ? 'Available' : 'Not available'}`);
     
     let fileContent: Buffer;
     
-    // Try to get content from the attachment
-    if (attachment.content) {
-      // Direct content available
-      if (attachment.content instanceof Buffer) {
-        fileContent = attachment.content;
-      } else if (typeof attachment.content === 'string') {
-        fileContent = Buffer.from(attachment.content, 'base64');
+    try {
+      // Try to get content from the attachment with improved handling
+      if (attachment.content) {
+        console.log(`📋 Using direct content attachment`);
+        // Direct content available
+        if (attachment.content instanceof Buffer) {
+          fileContent = attachment.content;
+        } else if (typeof attachment.content === 'string') {
+          // Try to detect if it's base64 encoded
+          try {
+            fileContent = Buffer.from(attachment.content, 'base64');
+          } catch (e) {
+            // If base64 fails, treat as plain text
+            fileContent = Buffer.from(attachment.content, 'utf8');
+          }
+        } else if (attachment.content instanceof ArrayBuffer) {
+          fileContent = Buffer.from(attachment.content);
+        } else {
+          // Fallback: stringify and convert
+          fileContent = Buffer.from(JSON.stringify(attachment.content));
+        }
+      } else if (attachment.contentUrl) {
+        console.log(`🌐 Downloading from content URL: ${attachment.contentUrl}`);
+        // Download from URL with enhanced error handling
+        const downloadResponse = await axios.get(attachment.contentUrl, { 
+          responseType: 'arraybuffer',
+          timeout: 30000,
+          maxRedirects: 3,
+          validateStatus: (status) => status < 400
+        });
+        fileContent = Buffer.from(downloadResponse.data);
+        console.log(`✅ Downloaded ${fileContent.length} bytes`);
       } else {
-        fileContent = Buffer.from(attachment.content);
+        console.error(`❌ No content source available for attachment`);
+        return "❌ Cannot access attachment content - no content URL or direct content available";
       }
-    } else if (attachment.contentUrl) {
-      // Download from URL
-      const downloadResponse = await axios.get(attachment.contentUrl, { 
-        responseType: 'arraybuffer',
-        timeout: 30000 
-      });
-      fileContent = Buffer.from(downloadResponse.data);
-    } else {
-      return "❌ Cannot access attachment content";
+    } catch (downloadError: any) {
+      console.error(`❌ Failed to get attachment content:`, downloadError);
+      return `❌ Failed to download attachment: ${downloadError.message}`;
     }
 
     // Validate file size (10MB limit - same as backend)
@@ -231,16 +251,49 @@ teamsBot.activity(
       const apiUrl = getApiUrl();
       const messageText = context.activity.text || "";
 
-      // Handle file attachments ONLY if they are actual user-uploaded files
+      // Enhanced file attachment detection with detailed logging
+      console.log(`🔍 Checking for attachments...`);
+      console.log(`📎 Total attachments: ${context.activity.attachments?.length || 0}`);
+      
+      if (context.activity.attachments && context.activity.attachments.length > 0) {
+        context.activity.attachments.forEach((att, index) => {
+          console.log(`   📄 Attachment ${index}:`);
+          console.log(`      - Name: ${att.name || 'No name'}`);
+          console.log(`      - ContentType: ${att.contentType || 'No content type'}`);
+          console.log(`      - ContentUrl: ${att.contentUrl ? 'Available' : 'Not available'}`);
+          console.log(`      - Content: ${att.content ? 'Available' : 'Not available'}`);
+          console.log(`      - Size: ${att.content ? (typeof att.content === 'string' ? att.content.length : 'Buffer') : 'Unknown'}`);
+        });
+      }
+
+      // Improved file attachment detection
       const hasRealAttachments = context.activity.attachments && 
                                 context.activity.attachments.length > 0 &&
-                                context.activity.attachments.some(att => 
-                                  att.name && 
-                                  att.contentType && 
-                                  !att.contentType.includes('messageCard') &&
-                                  !att.contentType.includes('application/vnd.microsoft') &&
-                                  (att.contentUrl || att.content)
-                                );
+                                context.activity.attachments.some(att => {
+                                  // More flexible detection logic
+                                  const hasName = att.name && att.name.trim() !== '';
+                                  const hasContentUrl = att.contentUrl && att.contentUrl.trim() !== '';
+                                  const hasContent = att.content;
+                                  const hasValidContentType = att.contentType && 
+                                    !att.contentType.includes('messageCard') &&
+                                    !att.contentType.includes('adaptive-card') &&
+                                    !att.contentType.includes('application/vnd.microsoft.card') &&
+                                    // Allow Teams file download info - this is a valid file attachment
+                                    !(att.contentType.includes('application/vnd.microsoft.teams') && 
+                                      !att.contentType.includes('file.download.info'));
+                                  
+                                  const isValidAttachment = (hasName || hasContentUrl) && 
+                                                          hasValidContentType && 
+                                                          (hasContentUrl || hasContent);
+                                  
+                                  console.log(`      ✅ Attachment validation: ${isValidAttachment ? 'VALID' : 'INVALID'}`);
+                                  console.log(`         - Has name: ${hasName}`);
+                                  console.log(`         - Has content URL: ${hasContentUrl}`);
+                                  console.log(`         - Has content: ${hasContent ? 'Yes' : 'No'}`);
+                                  console.log(`         - Valid content type: ${hasValidContentType}`);
+                                  
+                                  return isValidAttachment;
+                                });
 
       if (hasRealAttachments) {
         console.log(`📁 Processing file upload request`);
@@ -249,13 +302,22 @@ teamsBot.activity(
         const destinationText = messageText.trim() || "Upload to Documents library in SharePoint";
 
         for (const attachment of context.activity.attachments) {
-          // Skip system attachments
-          if (!attachment.name || 
+          // Enhanced filtering logic for system attachments
+          const isSystemAttachment = !attachment.name || 
               attachment.contentType?.includes('messageCard') || 
-              attachment.contentType?.includes('application/vnd.microsoft')) {
+              attachment.contentType?.includes('adaptive-card') ||
+              attachment.contentType?.includes('application/vnd.microsoft.card') ||
+              // Allow Teams file download info - this is a valid file attachment
+              (attachment.contentType?.includes('application/vnd.microsoft.teams') && 
+               !attachment.contentType?.includes('file.download.info')) ||
+              (!attachment.contentUrl && !attachment.content);
+          
+          if (isSystemAttachment) {
+            console.log(`⏭️ Skipping system attachment: ${attachment.contentType}`);
             continue;
           }
 
+          console.log(`📤 Processing file attachment: ${attachment.name}`);
           const result = await handleFileAttachment(context, attachment, destinationText);
           uploadResults.push(result);
         }
@@ -264,6 +326,24 @@ teamsBot.activity(
           await context.sendActivity(uploadResults.join("\n\n"));
           return;
         }
+      }
+
+      // Check for upload intent in message text (fallback for missed attachments)
+      const uploadKeywords = ['upload', 'file', 'document', 'attach', 'share'];
+      const hasUploadIntent = uploadKeywords.some(keyword => 
+        messageText.toLowerCase().includes(keyword)
+      );
+      
+      if (hasUploadIntent && (!messageText.trim() || messageText.trim().length < 10)) {
+        await context.sendActivity(
+          `🤔 It looks like you want to upload a file, but I don't see any attachments.\n\n` +
+          `**To upload files:**\n` +
+          `1. Drag and drop your file into this chat\n` +
+          `2. Or click the attachment button (📎) to select a file\n` +
+          `3. Add a message like "Upload to SharePoint site: [your-site-url]"\n\n` +
+          `**Supported file types:** PDF, DOCX, XLSX, PPTX, TXT, JPG, PNG, GIF, ZIP (max 10MB)`
+        );
+        return;
       }
 
       // Skip empty messages

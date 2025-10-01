@@ -47,11 +47,74 @@ const server = express();
 server.use(express.json());
 server.use(authorizeJWT(authConfig));
 
+// Add multer for file upload handling
+import multer from 'multer';
+import path from 'path';
+
+// Configure multer for memory storage
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { 
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 // Listen for incoming requests.
 server.post("/api/messages", async (req: Request, res: Response) => {
   await adapter.process(req, res, async (context) => {
     await teamsBot.run(context);
   });
+});
+
+// Add dedicated file upload endpoint as fallback
+server.post("/api/upload", upload.single('file'), async (req: any, res: any) => {
+  try {
+    console.log(`📤 Direct file upload request received`);
+    
+    if (!req.file) {
+      res.status(400).json({ error: "No file provided" });
+      return;
+    }
+
+    const { originalname, buffer, mimetype } = req.file;
+    const destination = req.body.destination || req.query.destination || "Upload to Documents library in SharePoint";
+    
+    console.log(`📄 File: ${originalname}, Size: ${buffer.length}, Type: ${mimetype}`);
+    
+    // Forward to backend API
+    const backendUrl = process.env.API_URL || "http://localhost:8000";
+    const FormData = require('form-data');
+    const axios = require('axios');
+    
+    const formData = new FormData();
+    formData.append('file', buffer, { 
+      filename: originalname, 
+      contentType: mimetype 
+    });
+
+    const uploadResponse = await axios.post(
+      `${backendUrl}/upload`,
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders(),
+        },
+        params: {
+          destination: destination
+        },
+        timeout: 30000
+      }
+    );
+
+    res.json(uploadResponse.data);
+    
+  } catch (error: any) {
+    console.error("Direct upload error:", error);
+    res.status(500).json({ 
+      error: "Upload failed", 
+      details: error.message 
+    });
+  }
 });
 
 // Add health check endpoint

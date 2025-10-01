@@ -25,10 +25,12 @@
     },
     "dependencies": {
         "@microsoft/agents-hosting": "^0.2.14",
+        "@types/multer": "^2.0.0",
         "axios": "^1.9.0",
+        "dotenv": "^16.0.0",
         "express": "^5.0.1",
         "form-data": "^4.0.0",
-        "dotenv": "^16.0.0"
+        "multer": "^2.0.2"
     },
     "devDependencies": {
         "@types/express": "^5.0.0",
