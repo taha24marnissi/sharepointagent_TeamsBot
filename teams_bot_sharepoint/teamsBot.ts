@@ -7,6 +7,9 @@ import {
 } from "@microsoft/agents-hosting"; 
 import axios from "axios";
 import FormData from "form-data";
+import { CardFactory } from "botbuilder";
+import { createApprovalCard } from "./cards/approvalCard";
+import { handleApprovalDecision } from "./helpers/approvalHelpers";
 
 interface ConversationState {
   count: number;
@@ -22,6 +25,7 @@ interface ChatRequest {
 
 interface ChatResponse {
   response: string;
+  status?: string;
 }
 
 interface UploadResponse {
@@ -60,27 +64,6 @@ async function checkBackendHealth(): Promise<boolean> {
   }
 }
 
-// Listen for user to say '/reset' and then delete conversation state
-teamsBot.message("/reset", async (context: TurnContext, state: ApplicationTurnState) => {
-  state.deleteConversationState();
-  await context.sendActivity("Ok I've deleted the current conversation state.");
-});
-
-// Debug command to check attachments
-teamsBot.message("/debug", async (context: TurnContext, state: ApplicationTurnState) => {
-  const attachmentInfo = {
-    count: context.activity.attachments?.length || 0,
-    attachments: context.activity.attachments?.map(att => ({
-      name: att.name,
-      contentType: att.contentType,
-      hasContentUrl: !!att.contentUrl,
-      hasContent: !!att.content
-    })) || []
-  };
-  
-  await context.sendActivity(`**Debug Info:**\n\`\`\`json\n${JSON.stringify(attachmentInfo, null, 2)}\n\`\`\``);
-}); 
- 
 teamsBot.conversationUpdate(
   "membersAdded",
   async (context: TurnContext, state: ApplicationTurnState) => {
@@ -242,6 +225,61 @@ async function handleFileAttachment(
   }
 }
 
+// Listen for approval button clicks (Action.Submit from Adaptive Cards)
+teamsBot.activity(
+  "invoke" as any,
+  async (context: TurnContext, state: ApplicationTurnState) => {
+    try {
+      // Handle adaptive card action submits
+      if (context.activity.name === "adaptiveCard/action") {
+        const actionData = (context.activity.value as any)?.action;
+        const conversationId = context.activity.conversation.id;
+        
+        console.log(`🔘 Adaptive card action received: ${actionData}`);
+        
+        if (actionData === "approval_proceed" || actionData === "approval_cancel") {
+          const decision = actionData === "approval_proceed" ? "Proceed" : "Cancel";
+          
+          // Update the card to show it's disabled
+          const disabledCard = createApprovalCard(
+            "Processing your decision...",
+            true,
+            decision
+          );
+          
+          // Update the original card message
+          try {
+            const cardMessage = {
+              type: 'message',
+              attachments: [CardFactory.adaptiveCard(disabledCard)]
+            };
+            
+            // Update using the activity ID
+            if (context.activity.replyToId) {
+              await context.updateActivity({
+                ...cardMessage,
+                id: context.activity.replyToId
+              } as any);
+            }
+          } catch (updateError) {
+            console.log("Could not update card (may not be supported in this channel):", updateError);
+          }
+          
+          // Process the approval decision
+          await context.sendActivity(`⏳ ${decision === "Proceed" ? "Processing your approval" : "Cancelling operation"}...`);
+          const apiUrl = getApiUrl();
+          const result = await handleApprovalDecision(apiUrl, conversationId, decision);
+          await context.sendActivity(result);
+          return;
+        }
+      }
+    } catch (error: any) {
+      console.error("Invoke handler error:", error);
+      await context.sendActivity(`❌ Error processing action: ${error.message}`);
+    }
+  }
+);
+
 // Listen for ANY message to be received. MUST BE AFTER ANY OTHER MESSAGE HANDLERS
 teamsBot.activity(
   ActivityTypes.Message,
@@ -250,6 +288,45 @@ teamsBot.activity(
       const conversationId = context.activity.conversation.id;
       const apiUrl = getApiUrl();
       const messageText = context.activity.text || "";
+      
+      // Check if this is a response to an approval card (value property contains action data)
+      if (context.activity.value && (context.activity.value as any).action) {
+        const action = (context.activity.value as any).action;
+        console.log(`🔘 Approval action detected: ${action}`);
+        
+        if (action === "approval_proceed" || action === "approval_cancel") {
+          const decision = action === "approval_proceed" ? "Proceed" : "Cancel";
+          
+          // Update the card to show it's disabled
+          const disabledCard = createApprovalCard(
+            "Processing your decision...",
+            true,
+            decision
+          );
+          
+          // Try to update the original card
+          try {
+            const cardMessage = {
+              type: 'message',
+              attachments: [CardFactory.adaptiveCard(disabledCard)]
+            };
+            
+            if (context.activity.replyToId) {
+              await context.updateActivity({
+                ...cardMessage,
+                id: context.activity.replyToId
+              } as any);
+            }
+          } catch (updateError) {
+            console.log("Could not update card (may not be supported in this channel):", updateError);
+          }
+          
+          await context.sendActivity(`⏳ ${decision === "Proceed" ? "Processing your approval" : "Cancelling operation"}...`);
+          const result = await handleApprovalDecision(apiUrl, conversationId, decision);
+          await context.sendActivity(result);
+          return;
+        }
+      }
 
       // Enhanced file attachment detection with detailed logging
       console.log(`🔍 Checking for attachments...`);
@@ -380,7 +457,23 @@ teamsBot.activity(
 
       const chatResponse = response.data as ChatResponse;
 
-      // Send the AI response back to Teams
+      // Check if approval is required (interrupted status)
+      if (chatResponse.status === "interrupted") {
+        console.log(`⚠️ Approval required - showing approval card`);
+        
+        // Create and send approval card
+        const approvalCard = createApprovalCard(chatResponse.response);
+        const cardAttachment = CardFactory.adaptiveCard(approvalCard);
+        
+        await context.sendActivity({
+          type: 'message',
+          attachments: [cardAttachment]
+        } as any);
+        
+        return; // Exit here, wait for user's approval decision
+      }
+
+      // Send the AI response back to Teams for normal flow
       const responseText = chatResponse.response || "I'm here to help you with anything you need!";
       
       console.log(`🤖 AI Response length: ${responseText.length} characters`);

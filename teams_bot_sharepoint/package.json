@@ -27,6 +27,7 @@
         "@microsoft/agents-hosting": "^0.2.14",
         "@types/multer": "^2.0.0",
         "axios": "^1.9.0",
+        "botbuilder": "^4.23.3",
         "dotenv": "^16.0.0",
         "express": "^5.0.1",
         "form-data": "^4.0.0",
