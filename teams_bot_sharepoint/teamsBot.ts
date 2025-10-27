@@ -8,7 +8,9 @@ import {
 import axios from "axios";
 import FormData from "form-data";
 import { CardFactory } from "botbuilder";
+import { Activity } from "@microsoft/agents-activity";
 import { createApprovalCard } from "./cards/approvalCard";
+import { createLoadingCard, createCompletionCard } from "./cards/loadingCard";
 import { handleApprovalDecision } from "./helpers/approvalHelpers";
 
 interface ConversationState {
@@ -443,41 +445,139 @@ teamsBot.activity(
         thread_id: conversationId
       };
 
-      // Send to your AI backend using the /chat endpoint
-      const response = await axios.post(
-        `${apiUrl}/chat`,
-        chatRequest,
-        {
-          headers: { 
-            "Content-Type": "application/json" 
-          },
-          timeout: 45000 // 45 second timeout for AI responses
+      // Show typing indicator immediately
+      await context.sendActivity({ type: ActivityTypes.Typing } as any);
+
+      // Track request start time
+      const startTime = Date.now();
+      let progressMessageSent = false;
+      let loadingCardActivityId: string | undefined;
+      let progressInterval: NodeJS.Timeout | null = null;
+
+      // Set up progress indicator for long-running requests
+      progressInterval = setInterval(async () => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        
+        if (elapsed >= 20 && !progressMessageSent) {
+          // After 20 seconds, send a beautiful loading card with ProgressBar
+          progressMessageSent = true;
+          
+          const loadingCard = createLoadingCard(
+            "This request is taking longer than usual. Processing complex operations ...",
+            
+          );
+          
+          const cardAttachment = CardFactory.adaptiveCard(loadingCard);
+          const loadingMessage = await context.sendActivity({
+            type: 'message',
+            attachments: [cardAttachment]
+          } as any);
+          
+          // Log the raw response to assist with adapter compatibility/debugging
+          console.log('📝 loading card sendActivity result:', loadingMessage);
+
+          // Store the activity ID for potential cleanup (adapter may return id or activity object)
+          loadingCardActivityId = loadingMessage?.id || (loadingMessage as any)?.activityId || undefined;
         }
-      );
+      }, 5000); // Check every 5 seconds
 
-      const chatResponse = response.data as ChatResponse;
+      try {
+        // Send to your AI backend using the /chat endpoint
+        const response = await axios.post(
+          `${apiUrl}/chat`,
+          chatRequest,
+          {
+            headers: { 
+              "Content-Type": "application/json" 
+            },
+            timeout: 0 // No timeout for long-running requests
+          }
+        );
 
-      // Check if approval is required (interrupted status)
-      if (chatResponse.status === "interrupted") {
-        console.log(`⚠️ Approval required - showing approval card`);
+        const chatResponse = response.data as ChatResponse;
+
+        // Clear the progress interval once we get a response
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+
+        // Check if approval is required (interrupted status)
+        if (chatResponse.status === "interrupted") {
+          console.log(`⚠️ Approval required - showing approval card`);
+          
+          // Create and send approval card
+          const approvalCard = createApprovalCard(chatResponse.response);
+          const cardAttachment = CardFactory.adaptiveCard(approvalCard);
+          
+          await context.sendActivity({
+            type: 'message',
+            attachments: [cardAttachment]
+          } as any);
+          
+          return; // Exit here, wait for user's approval decision
+        }
+
+        // Send the AI response back to Teams for normal flow
+        const responseText = chatResponse.response || "I'm here to help you with anything you need!";
         
-        // Create and send approval card
-        const approvalCard = createApprovalCard(chatResponse.response);
-        const cardAttachment = CardFactory.adaptiveCard(approvalCard);
+        console.log(`🤖 AI Response length: ${responseText.length} characters`);
         
-        await context.sendActivity({
-          type: 'message',
-          attachments: [cardAttachment]
-        } as any);
+        // Log completion time
+        const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        console.log(`✅ Request completed in ${totalTime} seconds`);
         
-        return; // Exit here, wait for user's approval decision
+        // If loading card was shown, UPDATE it to green completion state
+        if (progressMessageSent && loadingCardActivityId) {
+          try {
+            const completionCard = createCompletionCard(totalTime);
+            const completionAttachment = CardFactory.adaptiveCard(completionCard);
+
+            // Create an Activity instance so applyConversationReference exists and adapter normalization works
+            // Build a complete-ish activity object for updateActivity. Activity.fromObject validates
+            // the shape (Zod), so ensure `type` is present and include the conversation id.
+            const updatedActivityPayload: any = {
+              id: loadingCardActivityId,
+              type: 'message',
+              attachments: [completionAttachment],
+              conversation: { id: context.activity.conversation.id }
+            };
+
+            const updatedActivity = Activity.fromObject(updatedActivityPayload);
+            await context.updateActivity(updatedActivity as any);
+            console.log('✅ Updated loading card in-place to completion state');
+          } catch (updateErr) {
+            console.log('In-place update failed, falling back to send-only:', updateErr);
+            try {
+              const completionCard = createCompletionCard(totalTime);
+              const completionAttachment = CardFactory.adaptiveCard(completionCard);
+              await context.sendActivity({ type: 'message', attachments: [completionAttachment] } as any);
+            } catch (sendErr) {
+              console.log('Failed to send completion card as fallback:', sendErr);
+            }
+          }
+        } else if (progressMessageSent) {
+          // Progress shown but we don't have an id - just send completion card
+          try {
+            const completionCard = createCompletionCard(totalTime);
+            const completionAttachment = CardFactory.adaptiveCard(completionCard);
+            await context.sendActivity({ type: 'message', attachments: [completionAttachment] } as any);
+          } catch (sendErr) {
+            console.log('Failed to send completion card:', sendErr);
+          }
+        }
+        
+        await context.sendActivity(responseText);
+      } catch (requestError: any) {
+        // Clear the progress interval on error
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+        
+        // Re-throw to be caught by outer error handler
+        throw requestError;
       }
-
-      // Send the AI response back to Teams for normal flow
-      const responseText = chatResponse.response || "I'm here to help you with anything you need!";
-      
-      console.log(`🤖 AI Response length: ${responseText.length} characters`);
-      await context.sendActivity(responseText);
       
     } catch (error: any) {
       console.error("Bot message processing error:", error);
